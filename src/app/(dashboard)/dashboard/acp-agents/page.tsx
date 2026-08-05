@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
+import { useAsyncData } from "@/shared/hooks/useAsyncData";
 import Link from "next/link";
 import { Card, Button, Input } from "@/shared/components";
 import ProviderIcon from "@/shared/components/ProviderIcon";
@@ -53,9 +54,6 @@ function getAgentIconId(agentId: string): string | null {
 }
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [summary, setSummary] = useState<AgentSummary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -67,22 +65,26 @@ export default function AgentsPage() {
   });
   const t = useTranslations("acpAgents");
 
-  const fetchAgents = useCallback(async () => {
-    try {
-      const res = await fetch("/api/acp/agents");
-      const data = await res.json();
-      setAgents(data.agents || []);
-      setSummary(data.summary || null);
-    } catch (err) {
-      console.error("Failed to fetch agents:", err);
-    } finally {
-      setLoading(false);
+  const {
+    data,
+    loading,
+    reload: refetchAgents,
+    setData,
+  } = useAsyncData<{ agents: AgentInfo[]; summary: AgentSummary | null }>(
+    async (signal) => {
+      const res = await fetch("/api/acp/agents", { signal });
+      const json = await res.json();
+      return { agents: json.agents || [], summary: json.summary || null };
+    },
+    [],
+    {
+      initialData: { agents: [], summary: null },
+      onError: (err) => console.error("Failed to fetch agents:", err),
     }
-  }, []);
+  );
 
-  useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+  const agents = data?.agents ?? [];
+  const summary = data?.summary ?? null;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -92,9 +94,13 @@ export default function AgentsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "refresh" }),
       });
-      const data = await res.json();
-      setAgents(data.agents || []);
-      await fetchAgents();
+      const json = await res.json();
+      // Atualizacao intermediaria com a resposta do POST, como antes; o refetch
+      // logo abaixo e quem traz o estado final (inclusive o summary).
+      setData((prev) => ({ agents: json.agents || [], summary: prev?.summary ?? null }));
+      // `silent`: a tela faz `if (loading) return <spinner/>`, e o feedback de
+      // refresh e o proprio botao (`refreshing`).
+      await refetchAgents({ silent: true });
     } catch (err) {
       console.error("Failed to refresh:", err);
     } finally {
@@ -122,7 +128,7 @@ export default function AgentsPage() {
       if (res.ok) {
         setNewAgent({ name: "", binary: "", versionCommand: "", spawnArgs: "" });
         setShowAddForm(false);
-        await fetchAgents();
+        await refetchAgents({ silent: true });
       }
     } catch (err) {
       console.error("Failed to add agent:", err);
@@ -135,7 +141,7 @@ export default function AgentsPage() {
     try {
       const res = await fetch(`/api/acp/agents?id=${agentId}`, { method: "DELETE" });
       if (res.ok) {
-        await fetchAgents();
+        await refetchAgents({ silent: true });
       }
     } catch (err) {
       console.error("Failed to remove agent:", err);

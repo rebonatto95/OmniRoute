@@ -106,9 +106,7 @@ const mockFetch = vi.fn().mockResolvedValue({
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
-const { default: AcpAgentsPage } = await import(
-  "@/app/(dashboard)/dashboard/acp-agents/page"
-);
+const { default: AcpAgentsPage } = await import("@/app/(dashboard)/dashboard/acp-agents/page");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -187,7 +185,12 @@ describe("AcpAgentsPage", () => {
 
   it("agent grid renders with mocked /api/acp/agents response", async () => {
     const container = await renderPage();
-    expect(mockFetch).toHaveBeenCalledWith("/api/acp/agents");
+    // A busca passou a levar um AbortSignal (useAsyncData) para que a
+    // desmontagem cancele a requisicao de verdade. A URL continua a mesma.
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/acp/agents",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     // Agent names from mock should appear somewhere in the rendered output
     expect(container.textContent).toContain("Claude Code");
     expect(container.textContent).toContain("Codex");
