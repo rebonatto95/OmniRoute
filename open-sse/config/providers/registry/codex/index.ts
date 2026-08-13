@@ -6,6 +6,21 @@ import {
   resolvePublicCred,
 } from "../../shared.ts";
 
+/**
+ * Header-wait budget for reasoning-heavy effort tiers (#6354).
+ *
+ * These tiers can think for minutes before emitting response headers, which
+ * blows the global `DEFAULT_FETCH_TIMEOUT_MS` (90s) and gets scored as a target
+ * failure — the caller then pays the wasted 90s plus a retry/fallback.
+ *
+ * Applies to every tier at `high` or above (`high`, `xhigh`, `max`, `ultra`).
+ * It is deliberately a shared constant rather than a per-model literal: the
+ * original fix hand-wrote the value onto `high`/`xhigh` only, and `max`/`ultra`
+ * — which reason *more* — silently kept the 90s default. Guarded by
+ * `tests/unit/codex-reasoning-tier-timeout.test.ts`.
+ */
+export const REASONING_HEAVY_TIMEOUT_MS = 1_200_000;
+
 export const codexProvider: RegistryEntry = {
   id: "codex",
   alias: "cx",
@@ -33,25 +48,25 @@ export const codexProvider: RegistryEntry = {
       id: "gpt-5.6-sol-ultra",
       name: "GPT 5.6 Sol (Ultra)",
       ...GPT_5_6_CODEX_CAPABILITIES,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-sol-max",
       name: "GPT 5.6 Sol (Max)",
       ...GPT_5_6_CODEX_CAPABILITIES,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-sol-xhigh",
       name: "GPT 5.6 Sol (xHigh)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-sol-high",
       name: "GPT 5.6 Sol (High)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-sol-medium",
@@ -72,25 +87,25 @@ export const codexProvider: RegistryEntry = {
       id: "gpt-5.6-terra-ultra",
       name: "GPT 5.6 Terra (Ultra)",
       ...GPT_5_6_CODEX_CAPABILITIES,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-terra-max",
       name: "GPT 5.6 Terra (Max)",
       ...GPT_5_6_CODEX_CAPABILITIES,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-terra-xhigh",
       name: "GPT 5.6 Terra (xHigh)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-terra-high",
       name: "GPT 5.6 Terra (High)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-terra-medium",
@@ -111,20 +126,19 @@ export const codexProvider: RegistryEntry = {
       id: "gpt-5.6-luna-max",
       name: "GPT 5.6 Luna (Max)",
       ...GPT_5_6_CODEX_CAPABILITIES,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-luna-xhigh",
       name: "GPT 5.6 Luna (xHigh)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-luna-high",
       name: "GPT 5.6 Luna (High)",
       ...GPT_5_6_CODEX_CAPABILITIES,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.6-luna-medium",
@@ -161,8 +175,7 @@ export const codexProvider: RegistryEntry = {
       // #6191: input cap per reporter; TODO confirm exact value
       maxInputTokens: 272000,
       maxOutputTokens: 128000,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.5-high",
@@ -172,8 +185,7 @@ export const codexProvider: RegistryEntry = {
       // #6191: input cap per reporter; TODO confirm exact value
       maxInputTokens: 272000,
       maxOutputTokens: 128000,
-      // #6354: reasoning-heavy tier — more header-wait room than the global default.
-      timeoutMs: 1200000,
+      timeoutMs: REASONING_HEAVY_TIMEOUT_MS,
     },
     {
       id: "gpt-5.5-medium",
