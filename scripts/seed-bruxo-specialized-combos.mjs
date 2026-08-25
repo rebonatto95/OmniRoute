@@ -187,18 +187,32 @@ const bruxoRouting = {
         mid: "agentic-free-mid",
         high: "agentic-free-high",
         xhigh: "agentic-free-xhigh",
-        tools: "agentic-free-tools",
+        // Tools are a capability lane, not a fourth semantic category. Keep
+        // agentic requests on the active tools-free pool instead of the
+        // retired agentic-free-tools combo.
+        tools: "tools-free-mid",
       },
       analyser: {
         mid: "analyser-free-mid",
         high: "analyser-free-high",
         xhigh: "analyser-free-xhigh",
       },
+      reviewer: {
+        mid: "analyser-free-mid",
+        high: "analyser-free-high",
+        xhigh: "analyser-free-xhigh",
+      },
+      tools: { mid: "tools-free-mid", high: "tools-free-high", xhigh: "tools-free-xhigh" },
     },
   },
   // Tools are a capability filter, not a semantic difficulty floor. A simple
   // file read can remain MID; only the request's type/complexity raises level.
-  levelFloors: { multiTask: "xhigh", criticalRisk: "xhigh", largeContext: "xhigh" },
+  levelFloors: {
+    largeContext: "mid",
+    multiTask: "high",
+    criticalRisk: "xhigh",
+    tools: "mid",
+  },
 };
 
 console.log(`BRUXO specialized matrix (${apply ? "APPLY" : "DRY RUN"})`);
