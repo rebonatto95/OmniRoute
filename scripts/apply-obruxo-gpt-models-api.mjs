@@ -11,8 +11,6 @@ const premiumModels = [
   ["un-/gpt-5.6-sol", "UN GPT-5.6 Sol (free promo)", 10],
 ];
 const visionModels = [
-  ["un-/gpt-5.5", "UN GPT-5.5 (free promo, Vision)"],
-  ["un-/gpt-5.6-sol", "UN GPT-5.6 Sol (free promo, Vision)"],
   ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
   ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
   ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
@@ -51,8 +49,11 @@ for (const [name, free] of [
   const comboId = combo.id ?? comboIds.get(name);
   if (!comboId) throw new Error(`id nao encontrado: ${name}`);
   let models = Array.isArray(combo.models) ? combo.models.map((item) => ({ ...item })) : [];
-  let changed = false;
   const premiumIds = new Set(premiumModels.map(([model]) => model));
+  if (free) {
+    // The free route must remain compatible with its 1M-context contract.
+    models = models.filter((item) => !premiumIds.has(item.model));
+  }
   const basePriority = Math.max(
     0,
     ...models
@@ -60,40 +61,18 @@ for (const [name, free] of [
       .map((item) => (Number.isFinite(item.priority) ? item.priority : 0))
   );
 
-  for (let index = 0; index < premiumModels.length; index += 1) {
-    const [model, label, weight] = premiumModels[index];
-    const existing = models.find((item) => item.model === model);
-    if (existing) {
-      if (existing.label !== label) {
-        existing.label = label;
-        changed = true;
-      }
-      if (free) {
-        existing.priority = basePriority + index + 1;
-        if (existing.weight !== 0) {
-          existing.weight = 0;
-          changed = true;
+  if (!free) {
+    for (let index = 0; index < premiumModels.length; index += 1) {
+      const [model, label, weight] = premiumModels[index];
+      const existing = models.find((item) => item.model === model);
+      if (existing) {
+        if (existing.label !== label) {
+          existing.label = label;
         }
+        continue;
       }
-      continue;
+      models.push({ model, label, weight });
     }
-    const entry = { model, label, weight: free ? 0 : weight };
-    if (free) {
-      entry.id = `${name}-${models.length + 1}`;
-      entry.kind = "model";
-      entry.priority = basePriority + index + 1;
-    }
-    models.push(entry);
-    changed = true;
-  }
-
-  if (free) {
-    const ordered = [
-      ...models.filter((item) => premiumModels.some(([model]) => model === item.model)),
-      ...models.filter((item) => !premiumModels.some(([model]) => model === item.model)),
-    ];
-    if (ordered.some((item, index) => item !== models[index])) changed = true;
-    models = ordered;
   }
 
   const update = await fetch(`${baseUrl}/api/combos/${encodeURIComponent(comboId)}`, {

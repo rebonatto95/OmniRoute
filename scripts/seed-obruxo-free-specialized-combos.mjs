@@ -30,8 +30,6 @@ const pools = {
     ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
   ],
   vision: [
-    ["un-/gpt-5.5", "UN GPT-5.5 (free promo, Vision)"],
-    ["un-/gpt-5.6-sol", "UN GPT-5.6 Sol (free promo, Vision)"],
     ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
     ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
     ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
