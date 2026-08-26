@@ -67,6 +67,9 @@ vscode-extension
 
 # Build artifacts
 *.tgz
+*.tar
+*.tar.gz
+*.zip
 *.AppImage
 *.deb
 *.rpm
