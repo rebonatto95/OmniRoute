@@ -126,6 +126,14 @@ const TASK_PATTERNS: Record<TaskType, TaskPattern> = {
       "describe this image",
       "analyze this image",
       "read this screenshot",
+      "olhe para esta imagem",
+      "nesta imagem",
+      "o que voce ve",
+      "o que você vê",
+      "descreva esta imagem",
+      "analise esta imagem",
+      "leia este screenshot",
+      "leia esta captura",
     ],
     userPatterns: ["image_url", "data:image"],
   },
@@ -342,10 +350,7 @@ export function detectTaskType(body: any): TaskType {
 
   if (messages.length === 0) return "chat";
 
-  // 1. Vision — check for image_url in any message
-  if (hasImages(messages)) return "vision";
-
-  // 2. System prompt patterns (background first — most specific)
+  // 1. System prompt patterns (background first — most specific)
   const systemMsg = messages.find((m) => m.role === "system" || m.role === "developer");
   const systemText = systemMsg ? extractText(systemMsg.content) : "";
   const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");

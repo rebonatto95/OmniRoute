@@ -147,6 +147,52 @@ describe("BRUXO Master Router", () => {
     expect(result.resolvedCombo).toBe("coder-mid");
   });
 
+  it("keeps semantic coding intent when the request also contains a screenshot", () => {
+    const result = resolveBruxoRoute(
+      "bruxo",
+      {
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Fix this TypeScript function using the screenshot" },
+              { type: "image_url", image_url: { url: "https://example.com/screenshot.png" } },
+            ],
+          },
+        ],
+      },
+      config
+    );
+    expect(result.taskType).toBe("coder");
+    expect(result.category).toBe("coder");
+    expect(result.resolvedCombo).toBe("coder-mid");
+  });
+
+  it("uses the vision lane only for image-centric requests", () => {
+    const visionConfig: BruxoRoutingConfig = {
+      ...config,
+      routes: { ...config.routes, vision: { mid: "vision-mid" } },
+    };
+    const result = resolveBruxoRoute(
+      "bruxo",
+      {
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What do you see in this image?" },
+              { type: "image_url", image_url: { url: "https://example.com/image.png" } },
+            ],
+          },
+        ],
+      },
+      visionConfig
+    );
+    expect(result.taskType).toBe("vision");
+    expect(result.category).toBe("vision");
+    expect(result.resolvedCombo).toBe("vision-mid");
+  });
+
   it("keeps available tools neutral for ask and plan modes", () => {
     const result = resolveBruxoRoute(
       "bruxo",

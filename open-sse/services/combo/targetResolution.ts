@@ -106,6 +106,8 @@ export interface ResolveComboTargetPipelineDeps {
   isModelAvailable?: IsModelAvailable;
   /** handleSingleModel already wrapped by buildTargetTimeoutRunner. */
   handleSingleModelWithTimeout: HandleSingleModel;
+  /** Allow a caller-provided Vision Bridge to recover text-only targets. */
+  allowVisionBridgeFallback?: boolean;
   /**
    * Dependency-injected `buildAutoCandidates` — it lives in `combo.ts` (the host of
    * this leaf), so importing it directly would create an import cycle.
@@ -125,7 +127,7 @@ export interface ResolvedComboTargetPipeline {
 }
 
 export type ResolveComboTargetPipelineResult =
-  { earlyResponse: Response } | ResolvedComboTargetPipeline;
+  { earlyResponse: Response; visionFallbackRequired?: boolean } | ResolvedComboTargetPipeline;
 
 type WeightedResolution = ReturnType<typeof resolveWeightedTargets> | null;
 
@@ -455,7 +457,7 @@ async function applyContinuityFilters(
   initialOrderedTargets: ResolvedComboTarget[]
 ): Promise<
   | { orderedTargets: ResolvedComboTarget[]; sticky: ApplyStickinessResult }
-  | { earlyResponse: Response }
+  | { earlyResponse: Response; visionFallbackRequired?: boolean }
 > {
   const { strategy, body, combo, config, settings, log, relayOptions } = deps;
   // An explicit cache-optimized combo outranks the global cache-affinity default,
@@ -498,6 +500,27 @@ async function applyContinuityFilters(
   if (orderedTargets.length === 0 && preCompatTargets.length > 0) {
     const exhaustion = describeCapabilityFilterExhaustion(preCompatTargets, body, combo.name);
     if (exhaustion) {
+      if (
+        deps.allowVisionBridgeFallback &&
+        exhaustion.unmet.every((reason) => reason === "vision")
+      ) {
+        return {
+          earlyResponse: errorResponseWithComboDiagnostics(
+            400,
+            exhaustion.message,
+            {
+              poolSize: preCompatTargets.length,
+              attempted: 0,
+              excluded: exhaustion.excluded,
+              attemptOrder: [],
+              terminalReason: exhaustion.terminalReason,
+              recovery: buildRecoveryHint("no_executable_targets"),
+            },
+            { code: "capability_mismatch", type: "invalid_request_error" }
+          ),
+          visionFallbackRequired: true,
+        };
+      }
       // Match handleComboChat: only track failures under context-cache protection pins.
       const effectiveSessionId: string | null = combo.context_cache_protection
         ? (relayOptions?.sessionId ?? null)

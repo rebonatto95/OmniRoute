@@ -21,7 +21,6 @@ test("#2373: NVIDIA NIM registry gains the newly-observed chat-completions model
     "google/gemma-2-2b-it",
     "google/gemma-3n-e2b-it",
     "meta/llama-3.1-8b-instruct",
-    "meta/llama-3.2-11b-vision-instruct",
     "meta/llama-4-maverick-17b-128e-instruct",
     "meta/llama-guard-4-12b",
     "mistralai/ministral-14b-instruct-2512",
@@ -58,6 +57,10 @@ test("#2373: reasoning-capable NVIDIA-hosted models are flagged supportsReasonin
     assert.ok(model, `model ${id} must exist`);
     assert.equal(model?.supportsReasoning, true, `${id} must be supportsReasoning: true`);
   }
+});
+
+test("NVIDIA: the dead Llama 3.2 11B Vision model stays excluded", () => {
+  assert.ok(!modelIds.has("meta/llama-3.2-11b-vision-instruct"));
 });
 
 test("#2373/#3329: minimaxai/minimax-m3 stays excluded from the nvidia tier", () => {

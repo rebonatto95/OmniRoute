@@ -61,6 +61,8 @@ import {
   isOpenAIResponsesStoreEnabled,
 } from "@/lib/providers/requestDefaults";
 import { guardrailRegistry, resolveDisabledGuardrails } from "@/lib/guardrails";
+import { getResolvedModelCapabilities } from "@/lib/modelCapabilities";
+import { extractImageParts } from "@/lib/guardrails/visionBridgeHelpers";
 import {
   resolveModelOrError,
   checkPipelineGates,
@@ -233,6 +235,10 @@ function intersectAllowedConnectionIds(primary: unknown, secondary: unknown): st
 }
 
 const comboPromoteDeps = { updateCombo, info: log.info, warn: log.warn };
+
+function requestHasImages(body: Record<string, unknown>): boolean {
+  return Array.isArray(body.messages) && extractImageParts(body.messages as never).length > 0;
+}
 
 export { shouldTripProviderBreakerForResult } from "./chatPredicates";
 
@@ -598,6 +604,8 @@ export async function handleChat(
   // persisted category/complexity-specific combo before generic task routing.
   let resolvedModelStr = modelStr;
   let bruxoRouteResolved = false;
+  let visionBridgeFallback:
+    ((body: Record<string, unknown>) => Promise<Record<string, unknown> | null>) | undefined;
   const bruxoSettings = (await getCachedSettings().catch(() => ({}))) as Record<string, unknown>;
   const bruxoConfig = normalizeBruxoRoutingConfig(bruxoSettings.bruxoRouting);
   const bruxoHeaders = request.headers ? Object.fromEntries(request.headers.entries()) : {};
@@ -609,6 +617,7 @@ export async function handleChat(
   );
   if (bruxoRoute.matched && bruxoRoute.resolvedCombo) {
     resolvedModelStr = bruxoRoute.resolvedCombo;
+    const scopedComboModel = resolvedModelStr;
     body = { ...body, model: bruxoRoute.resolvedCombo };
     bruxoRouteResolved = true;
     void saveRoutingObservation({
@@ -624,7 +633,7 @@ export async function handleChat(
       toolUse: bruxoRoute.toolUse ?? null,
       toolsRequired:
         bruxoRoute.toolUse === "required" || (Array.isArray(body?.tools) && body.tools.length > 0),
-      visionRequired: bruxoRoute.taskType === "vision" || bruxoRoute.category === "vision",
+      visionRequired: requestHasImages(body as Record<string, unknown>),
       complexity: bruxoRoute.complexity ?? null,
       score: bruxoRoute.score ?? null,
       signals: bruxoRoute.signals ?? [],
@@ -635,6 +644,40 @@ export async function handleChat(
       "BRUXO",
       `mode=${bruxoRoute.mode ?? "unknown"} taskType=${bruxoRoute.taskType ?? "unknown"} category=${bruxoRoute.category} toolUse=${bruxoRoute.toolUse ?? "unknown"} complexity=${bruxoRoute.complexity} score=${bruxoRoute.score ?? "n/a"} signals=${(bruxoRoute.signals ?? []).join(",") || "none"} inputTokens=${bruxoRoute.inputTokens ?? "n/a"} level=${bruxoRoute.level} combo=${bruxoRoute.resolvedCombo} fallback=${bruxoRoute.fallbackApplied === true}`
     );
+
+    // The first guardrail pass happens before BRUXO resolution so it can handle
+    // ordinary direct model requests. For BRUXO, expose a one-shot recovery
+    // callback to combo routing instead of eagerly converting every image: native
+    // targets get the original image first, and text-only fallbacks get a bridge
+    // description only after native Vision is exhausted.
+    const visionPassDisabled = [
+      ...disabledGuardrails,
+      ...guardrailRegistry
+        .list()
+        .map((guardrail) => guardrail.name)
+        .filter((name) => name !== "vision-bridge"),
+    ];
+    visionBridgeFallback = async (candidateBody) => {
+      const scopedVisionPass = await guardrailRegistry.runPreCallHooks(candidateBody, {
+        apiKeyInfo: apiKeyInfo as any,
+        disabledGuardrails: [...new Set(visionPassDisabled)],
+        endpoint: new URL(request.url).pathname,
+        headers: request.headers,
+        log,
+        method: request.method,
+        model: scopedComboModel,
+        routingEntryModel: modelStr,
+        stream: candidateBody?.stream === true,
+      });
+      if (scopedVisionPass.blocked) {
+        log.warn("VISION_BRIDGE", scopedVisionPass.message || "BRUXO Vision fallback was blocked");
+        return null;
+      }
+      const bridgedBody = scopedVisionPass.payload as Record<string, unknown>;
+      // A failed/partial bridge preserves original images by design. Do not
+      // retry a text-only target with those images still present.
+      return requestHasImages(bridgedBody) ? null : bridgedBody;
+    };
   } else if (bruxoRoute.matched) {
     void saveRoutingObservation({
       requestId: reqId,
@@ -647,7 +690,7 @@ export async function handleChat(
       toolUse: bruxoRoute.toolUse ?? null,
       toolsRequired:
         bruxoRoute.toolUse === "required" || (Array.isArray(body?.tools) && body.tools.length > 0),
-      visionRequired: bruxoRoute.taskType === "vision" || bruxoRoute.category === "vision",
+      visionRequired: requestHasImages(body as Record<string, unknown>),
       complexity: bruxoRoute.complexity ?? null,
       score: bruxoRoute.score ?? null,
       signals: bruxoRoute.signals ?? [],
@@ -664,13 +707,17 @@ export async function handleChat(
   if (!bruxoRouteResolved && !isVisionBridgeInternalCall && getTaskRoutingConfig().enabled) {
     telemetry.startPhase("task-route");
     const tr = applyTaskAwareRouting(modelStr, body);
-    if (tr.wasRouted) {
+    const nativeVisionModel =
+      tr.taskType === "vision" && getResolvedModelCapabilities(modelStr).supportsVision === true;
+    if (tr.wasRouted && !nativeVisionModel) {
       resolvedModelStr = tr.model;
       body = { ...body, model: tr.model };
       log.info(
         "T05",
         `Task-Aware: detected="${tr.taskType}" → model override: ${modelStr} → ${tr.model}`
       );
+    } else if (nativeVisionModel) {
+      log.info("T05", `Native Vision preserved: ${modelStr} (no auto/vision override)`);
     } else if (tr.taskType !== "chat") {
       log.debug("T05", `Task-Aware: detected="${tr.taskType}" (no override configured)`);
     }
@@ -856,6 +903,7 @@ export async function handleChat(
     const response = await (handleComboChat as any)({
       body,
       combo,
+      visionBridgeFallback,
       handleSingleModel: (
         b: any,
         m: string,

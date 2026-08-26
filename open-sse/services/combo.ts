@@ -566,6 +566,7 @@ export async function handleComboChat({
   body,
   combo,
   handleSingleModel,
+  visionBridgeFallback,
   isModelAvailable,
   log,
   settings,
@@ -595,6 +596,32 @@ export async function handleComboChat({
     comboTargetTimeoutMs,
     log,
   });
+
+  // Keep native Vision as the first path. The bridge is a recovery path for a
+  // combo whose native targets were exhausted, so DeepSeek/text-only fallbacks
+  // can receive a safe textual description without ever seeing raw image parts.
+  const retryWithVisionBridge = async (reason: string): Promise<Response | null> => {
+    if (!visionBridgeFallback) return null;
+    const bridgedBody = await visionBridgeFallback(body);
+    if (!bridgedBody || bridgedBody === body) return null;
+    log.info(
+      "VISION_BRIDGE",
+      `Retrying combo ${combo.name} after native Vision exhaustion (${reason})`
+    );
+    return handleComboChat({
+      body: bridgedBody,
+      combo,
+      handleSingleModel,
+      isModelAvailable,
+      log,
+      settings,
+      allCombos,
+      relayOptions,
+      signal,
+      apiKeyAllowedConnections,
+      nesting,
+    });
+  };
 
   // Dispatch prelude: context-cache pin → fusion → chaos → pipeline → nested
   // combo-ref execute mode → round-robin. Each branch either owns the request or
@@ -683,6 +710,7 @@ export async function handleComboChat({
       body,
       combo,
       handleSingleModel: handleSingleModelWithTimeout,
+      visionBridgeFallback,
       isModelAvailable,
       log,
       settings,
@@ -711,9 +739,16 @@ export async function handleComboChat({
     resilienceSettings,
     isModelAvailable,
     handleSingleModelWithTimeout,
+    allowVisionBridgeFallback: Boolean(visionBridgeFallback),
     buildAutoCandidates,
   });
-  if ("earlyResponse" in targetResolution) return targetResolution.earlyResponse;
+  if ("earlyResponse" in targetResolution) {
+    if (targetResolution.visionFallbackRequired) {
+      const bridgedResponse = await retryWithVisionBridge("no native Vision target");
+      if (bridgedResponse) return bridgedResponse;
+    }
+    return targetResolution.earlyResponse;
+  }
   const { stickyWeightedLimit, getWeightedStepKeyForTarget, preScreenMap } = targetResolution;
   const _sticky = targetResolution.sticky;
   let orderedTargets = targetResolution.orderedTargets;
@@ -2006,6 +2041,8 @@ export async function handleComboChat({
       if (setTry < maxSetRetries) continue;
 
       // All set retries exhausted — return the final error
+      const bridgedResponse = await retryWithVisionBridge("all native Vision targets failed");
+      if (bridgedResponse) return bridgedResponse;
       if (!lastStatus) {
         notifyWebhookEvent("request.failed", {
           combo: combo.name,
@@ -2177,6 +2214,7 @@ async function handleRoundRobinCombo({
   body,
   combo,
   handleSingleModel,
+  visionBridgeFallback,
   isModelAvailable,
   log,
   settings,
@@ -2203,6 +2241,26 @@ async function handleRoundRobinCombo({
   const resilienceSettings: ResilienceSettings = settings
     ? resolveResilienceSettings(settings)
     : resolveResilienceSettings(null);
+
+  const retryWithVisionBridge = async (reason: string): Promise<Response | null> => {
+    if (!visionBridgeFallback) return null;
+    const bridgedBody = await visionBridgeFallback(body);
+    if (!bridgedBody || bridgedBody === body) return null;
+    log.info(
+      "VISION_BRIDGE",
+      `Retrying combo ${combo.name} after native Vision exhaustion (${reason})`
+    );
+    return handleComboChat({
+      body: bridgedBody,
+      combo,
+      handleSingleModel,
+      isModelAvailable,
+      log,
+      settings,
+      allCombos,
+      signal,
+    });
+  };
 
   // #2562: Expand provider-wildcard steps before resolving targets.
   const rrExpandedCombo = await expandProviderWildcardsInCombo(combo);
@@ -2267,6 +2325,8 @@ async function handleRoundRobinCombo({
   );
   let modelCount = filteredTargets.length;
   if (modelCount === 0) {
+    const bridgedResponse = await retryWithVisionBridge("no native Vision target");
+    if (bridgedResponse) return bridgedResponse;
     const exhaustion = describeCapabilityFilterExhaustion(
       evalRankedTargets,
       body,
@@ -2934,6 +2994,9 @@ async function handleRoundRobinCombo({
   // attempted (recordedAttempts === 0). Before crystallizing 503, probe the targets
   // the compat pre-filter rejected — a compat-rejected-but-healthy provider is a
   // valid last-resort fallback tier, not a permanently dropped target.
+  const bridgedResponse = await retryWithVisionBridge("all native Vision targets failed");
+  if (bridgedResponse) return bridgedResponse;
+
   if (recordedAttempts === 0 && compatRejectedTargets.length > 0) {
     const compatFallbackResult = await attemptCompatRejectedFallback(compatRejectedTargets, body, {
       handleSingleModel,

@@ -29,6 +29,13 @@ const pools = {
     ["gemini/gemini-3.5-flash", "Gemini 3.5 Flash"],
     ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
   ],
+  vision: [
+    ["un-/gpt-5.5", "UN GPT-5.5 (free promo, Vision)"],
+    ["un-/gpt-5.6-sol", "UN GPT-5.6 Sol (free promo, Vision)"],
+    ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
+    ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
+    ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
+  ],
 };
 
 function combo(name, description, pool) {
@@ -73,6 +80,9 @@ const combos = [
   combo("analyser-free-mid", "BRUXO Free Analyser — MID", pools.fast),
   combo("analyser-free-high", "BRUXO Free Analyser — HIGH", pools.deep),
   combo("analyser-free-xhigh", "BRUXO Free Analyser — XHIGH", pools.deep),
+  combo("vision-free-mid", "BRUXO Free Vision — MID", pools.vision),
+  combo("vision-free-high", "BRUXO Free Vision — HIGH", pools.vision),
+  combo("vision-free-xhigh", "BRUXO Free Vision — XHIGH", pools.vision),
 ];
 
 const freeRoutes = {
@@ -85,6 +95,7 @@ const freeRoutes = {
   },
   tools: { mid: "tools-free-mid", high: "tools-free-high", xhigh: "tools-free-xhigh" },
   analyser: { mid: "analyser-free-mid", high: "analyser-free-high", xhigh: "analyser-free-xhigh" },
+  vision: { mid: "vision-free-mid", high: "vision-free-high", xhigh: "vision-free-xhigh" },
 };
 
 console.log(`BRUXO Free specialized matrix (${apply ? "APPLY" : "DRY RUN"})`);

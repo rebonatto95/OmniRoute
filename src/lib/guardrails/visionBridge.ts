@@ -28,6 +28,19 @@ export { isProviderConnectionUsable, hasUsableCredentialsForModel };
 
 type ComboVisionBridgeDecision = "process" | "skip" | "not-combo";
 
+const BRUXO_ENTRY_MODELS = new Set(["bruxo", "obruxo", "obruxo-free", "bruxo-max", "auto/coding"]);
+const FREE_VISION_BRIDGE_MODELS = ["un-/gpt-5.5", "un-/gpt-5.6-sol"];
+const PREMIUM_VISION_BRIDGE_MODEL = "codex/gpt-5.6-sol";
+
+function isBruxoEntryModel(model: string): boolean {
+  return BRUXO_ENTRY_MODELS.has(model.trim().toLowerCase());
+}
+
+function isFreeBruxoRoute(model: string | null | undefined): boolean {
+  const normalized = model?.trim().toLowerCase() || "";
+  return normalized === "obruxo-free" || normalized.includes("-free-");
+}
+
 function isLocalBaseUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -134,7 +147,8 @@ export interface VisionBridgeDependencies {
   callVisionModel?: (
     imageDataUri: string,
     config: import("./visionBridgeHelpers").VisionModelConfig,
-    apiKey?: string
+    apiKey?: string,
+    routerConfig?: Partial<import("./visionBridgeRouter").VisionBridgeRouterConfig>
   ) => Promise<string>;
   /** Override combo-target vision check — return true to force processing, false to skip. */
   checkModelHasComboMapping?: (model: string) => Promise<boolean>;
@@ -171,6 +185,14 @@ export class VisionBridgeGuardrail extends BaseGuardrail {
     const model =
       context.model || ((payload as Record<string, unknown>)?.model as string | undefined);
     if (!model) {
+      return { block: false };
+    }
+
+    // BRUXO entries are resolved after the general guardrail pass. Do not
+    // hijack the entry into global auto/vision before the master router can
+    // select its category/level-specific combo. A scoped Vision Bridge pass
+    // runs after that resolution in chat.ts.
+    if (isBruxoEntryModel(model)) {
       return { block: false };
     }
 
@@ -321,6 +343,32 @@ export class VisionBridgeGuardrail extends BaseGuardrail {
       visionBridgeMaxImages: settings.visionBridgeMaxImages as number | undefined,
     });
 
+    const routingEntry = context.routingEntryModel || model;
+    const configuredBridgeModel =
+      typeof settings.visionBridgeModel === "string" && settings.visionBridgeModel.trim()
+        ? settings.visionBridgeModel.trim()
+        : undefined;
+    const freeRoute = isFreeBruxoRoute(routingEntry) || isFreeBruxoRoute(model);
+    const premiumBruxoRoute =
+      !freeRoute &&
+      (isBruxoEntryModel(routingEntry) || /(?:^|-)(?:mid|high|xhigh|max)(?:-|$)/i.test(model));
+    const bridgeRouterConfig = freeRoute
+      ? {
+          allowedModels: FREE_VISION_BRIDGE_MODELS,
+          maxFallbackAttempts: FREE_VISION_BRIDGE_MODELS.length,
+        }
+      : undefined;
+    const scopedConfig = {
+      ...config,
+      model: freeRoute
+        ? FREE_VISION_BRIDGE_MODELS.includes(configuredBridgeModel || "")
+          ? configuredBridgeModel!
+          : FREE_VISION_BRIDGE_MODELS[0]
+        : premiumBruxoRoute && !configuredBridgeModel
+          ? PREMIUM_VISION_BRIDGE_MODEL
+          : config.model,
+    };
+
     // 11. Limit images
     const limitedParts = imageParts.slice(0, config.maxImages);
 
@@ -328,14 +376,19 @@ export class VisionBridgeGuardrail extends BaseGuardrail {
     const callVision = this.deps.callVisionModel ?? defaultCallVisionModel;
     const logger = context.log;
     const startTime = Date.now();
-    const visionApiKey = shouldForwardRequestApiKeyToVisionBridge(config.model)
+    const visionApiKey = shouldForwardRequestApiKeyToVisionBridge(scopedConfig.model)
       ? extractBearerApiKey(context.headers)
       : undefined;
 
     // Process all images in parallel using Promise.allSettled for fail-partial behavior
     const results = await Promise.allSettled(
       limitedParts.map(async (imagePart, i) => {
-        const description = await callVision(imagePart.imageUrl, config, visionApiKey);
+        const description = await callVision(
+          imagePart.imageUrl,
+          scopedConfig,
+          visionApiKey,
+          bridgeRouterConfig
+        );
         return `[Image ${i + 1}]: ${description}`;
       })
     );
@@ -369,7 +422,7 @@ export class VisionBridgeGuardrail extends BaseGuardrail {
         // Keep meta observability stable: report a human label for failures.
         descriptions: descriptions.map((d, i) => d ?? `[Image ${i + 1}]: (unavailable)`),
         processingTimeMs: processingTime,
-        visionModel: config.model,
+        visionModel: scopedConfig.model,
       },
     };
   }

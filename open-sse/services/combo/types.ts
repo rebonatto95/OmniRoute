@@ -105,6 +105,8 @@ export type HandleComboChatOptions = {
   body: Record<string, unknown>;
   combo: ComboLike;
   handleSingleModel: HandleSingleModel;
+  /** Convert image parts to text once native-Vision targets are exhausted. */
+  visionBridgeFallback?: (body: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
   isModelAvailable?: IsModelAvailable;
   log: ComboLogger;
   settings?: Record<string, unknown> | null;

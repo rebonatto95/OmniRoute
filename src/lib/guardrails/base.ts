@@ -14,6 +14,8 @@ export interface GuardrailContext {
   method?: string | null;
   model?: string | null;
   provider?: string | null;
+  /** Original client-facing BRUXO entry when a scoped route is processed. */
+  routingEntryModel?: string | null;
   sourceFormat?: string | null;
   stream?: boolean;
   targetFormat?: string | null;

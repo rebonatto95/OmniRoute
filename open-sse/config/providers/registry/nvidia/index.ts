@@ -50,11 +50,6 @@ export const nvidiaProvider: RegistryEntry = {
     { id: "google/gemma-2-2b-it", name: "Gemma 2 2B IT" },
     { id: "google/gemma-3n-e2b-it", name: "Gemma 3n E2B IT" },
     { id: "meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B Instruct", toolCalling: false },
-    {
-      id: "meta/llama-3.2-11b-vision-instruct",
-      name: "Llama 3.2 11B Vision Instruct",
-      supportsVision: true,
-    },
     { id: "meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B Instruct" },
     { id: "meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B Instruct", toolCalling: false },
     {

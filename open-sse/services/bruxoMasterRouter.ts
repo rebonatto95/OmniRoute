@@ -182,13 +182,13 @@ function isReviewRequest(text: string): boolean {
 function taskTypeFromRequest(body: Record<string, unknown>, mode: BruxoMode): BruxoTaskType {
   const detected = detectTaskType(body);
   const text = lastUserText(body);
-  if (detected === "vision") return "vision";
   if (isReviewRequest(text)) return "reviewer";
   if (detected === "coding") return "coder";
   // Delegation is a semantic agentic lane. Explicit coding/review intent wins
   // so a coding subagent still reaches the coder matrix.
   if (mode === "subagent" || mode === "multi-task") return "agentic";
   if (detected === "analysis") return "analyser";
+  if (detected === "vision") return "vision";
   return "general";
 }
 

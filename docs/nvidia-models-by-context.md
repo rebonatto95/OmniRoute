@@ -101,7 +101,6 @@ A **maior faixa** — cobre a maioria dos LLMs modernos. Ideal para **dev normal
 | Modelo               | Prefixo no Gateway                               |
 | -------------------- | ------------------------------------------------ |
 | Llama 3.2 90B Vision | `nvidia/meta/llama-3.2-90b-vision-instruct`      |
-| Llama 3.2 11B Vision | `nvidia/meta/llama-3.2-11b-vision-instruct`      |
 | Nemotron Nano VL 8B  | `nvidia/nvidia/llama-3.1-nemotron-nano-vl-8b-v1` |
 
 ---

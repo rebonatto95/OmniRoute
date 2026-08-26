@@ -34,6 +34,8 @@ export interface VisionBridgeRouterConfig {
   minLatencySamples: number;
   /** Models to exclude from auto-routing */
   excludedModels: string[];
+  /** Optional allowlist used to keep free and premium bridge pools isolated. */
+  allowedModels?: string[];
 }
 
 const DEFAULT_ROUTER_CONFIG: VisionBridgeRouterConfig = {
@@ -185,6 +187,16 @@ function selectBestModel(
     // Exclude explicitly excluded models
     if (config.excludedModels.includes(c.fullName)) return false;
     if (config.excludedModels.includes(c.modelId)) return false;
+    if (
+      config.allowedModels?.length &&
+      !config.allowedModels.some(
+        (allowed) =>
+          allowed.toLowerCase() === c.fullName.toLowerCase() ||
+          allowed.toLowerCase() === c.modelId.toLowerCase()
+      )
+    ) {
+      return false;
+    }
 
     // Exclude models with poor success rate (< 50%)
     if (c.successRate < 0.5) return false;
@@ -224,10 +236,14 @@ export async function getBestVisionModel(
 
   // Check selection cache — key includes excluded models to prevent cache pollution
   // across different configurations
-  const cacheKey =
+  const cacheKey = [
     fullConfig.excludedModels.length > 0
       ? `excl:${[...fullConfig.excludedModels].sort().join(",")}`
-      : "default";
+      : "default",
+    fullConfig.allowedModels?.length
+      ? `allow:${[...fullConfig.allowedModels].sort().join(",")}`
+      : "all",
+  ].join("|");
   const cached = selectionCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.modelId;
@@ -268,6 +284,12 @@ export async function getFallbackModels(
     (c) =>
       c.fullName !== excludeModel &&
       !fullConfig.excludedModels.includes(c.fullName) &&
+      (!fullConfig.allowedModels?.length ||
+        fullConfig.allowedModels.some(
+          (allowed) =>
+            allowed.toLowerCase() === c.fullName.toLowerCase() ||
+            allowed.toLowerCase() === c.modelId.toLowerCase()
+        )) &&
       c.successRate >= 0.5
   );
 
