@@ -39,7 +39,7 @@ test("BRUXO entries are not rerouted before the master router resolves them", as
   assert.equal(bridgeCalls, 0);
 });
 
-test("free BRUXO routes keep the Vision Bridge inside the free allowlist", async () => {
+test("free BRUXO routes honor the configured Vision Bridge model before free fallbacks", async () => {
   let selectedModel = "";
   let allowedModels: string[] | undefined;
   const guardrail = new VisionBridgeGuardrail({
@@ -47,7 +47,7 @@ test("free BRUXO routes keep the Vision Bridge inside the free allowlist", async
     deps: {
       getSettings: async () => ({
         visionBridgeEnabled: true,
-        visionBridgeModel: "claude/claude-fable-5",
+        visionBridgeModel: "[VB]-/minimax-m3",
       }),
       checkModelHasComboMapping: async () => true,
       callVisionModel: async (_image, config, _apiKey, routerConfig) => {
@@ -64,6 +64,6 @@ test("free BRUXO routes keep the Vision Bridge inside the free allowlist", async
   });
 
   assert.ok(result.modifiedPayload);
-  assert.equal(selectedModel, "un-/gpt-5.5");
-  assert.deepEqual(allowedModels, ["un-/gpt-5.5", "un-/gpt-5.6-sol"]);
+  assert.equal(selectedModel, "[VB]-/minimax-m3");
+  assert.deepEqual(allowedModels, ["[VB]-/minimax-m3", "un-/gpt-5.5", "un-/gpt-5.6-sol"]);
 });

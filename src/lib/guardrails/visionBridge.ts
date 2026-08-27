@@ -30,7 +30,15 @@ type ComboVisionBridgeDecision = "process" | "skip" | "not-combo";
 
 const BRUXO_ENTRY_MODELS = new Set(["bruxo", "obruxo", "obruxo-free", "bruxo-max", "auto/coding"]);
 const FREE_VISION_BRIDGE_MODELS = ["un-/gpt-5.5", "un-/gpt-5.6-sol"];
-const PREMIUM_VISION_BRIDGE_MODEL = "codex/gpt-5.6-sol";
+const PREMIUM_VISION_BRIDGE_MODELS = [
+  "gemini/gemini-3.5-flash",
+  "gemini/gemini-3.1-flash-lite",
+  "gemini/gemini-2.5-flash-lite",
+  "antigravity/gemini-3.6-flash-medium",
+  "antigravity/gemini-3.6-flash-high",
+  "codex/gpt-5.6-sol",
+];
+const PREMIUM_VISION_BRIDGE_MODEL = PREMIUM_VISION_BRIDGE_MODELS[0];
 
 function isBruxoEntryModel(model: string): boolean {
   return BRUXO_ENTRY_MODELS.has(model.trim().toLowerCase());
@@ -352,18 +360,27 @@ export class VisionBridgeGuardrail extends BaseGuardrail {
     const premiumBruxoRoute =
       !freeRoute &&
       (isBruxoEntryModel(routingEntry) || /(?:^|-)(?:mid|high|xhigh|max)(?:-|$)/i.test(model));
+    const freeBridgeModels = configuredBridgeModel
+      ? [
+          configuredBridgeModel,
+          ...FREE_VISION_BRIDGE_MODELS.filter((candidate) => candidate !== configuredBridgeModel),
+        ]
+      : FREE_VISION_BRIDGE_MODELS;
     const bridgeRouterConfig = freeRoute
       ? {
-          allowedModels: FREE_VISION_BRIDGE_MODELS,
-          maxFallbackAttempts: FREE_VISION_BRIDGE_MODELS.length,
+          allowedModels: freeBridgeModels,
+          maxFallbackAttempts: freeBridgeModels.length,
         }
-      : undefined;
+      : premiumBruxoRoute
+        ? {
+            allowedModels: PREMIUM_VISION_BRIDGE_MODELS,
+            maxFallbackAttempts: PREMIUM_VISION_BRIDGE_MODELS.length,
+          }
+        : undefined;
     const scopedConfig = {
       ...config,
       model: freeRoute
-        ? FREE_VISION_BRIDGE_MODELS.includes(configuredBridgeModel || "")
-          ? configuredBridgeModel!
-          : FREE_VISION_BRIDGE_MODELS[0]
+        ? freeBridgeModels[0]
         : premiumBruxoRoute && !configuredBridgeModel
           ? PREMIUM_VISION_BRIDGE_MODEL
           : config.model,

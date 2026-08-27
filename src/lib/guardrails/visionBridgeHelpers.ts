@@ -317,6 +317,7 @@ async function callVisionModelSingle(
             },
           ],
           max_tokens: 300,
+          stream: false,
         }),
       });
     } else {
@@ -370,6 +371,7 @@ async function callVisionModelSingle(
             },
           ],
           max_tokens: 300,
+          stream: false,
         }),
       });
     }

@@ -7,33 +7,42 @@ const apply = process.argv.includes("--apply");
 const databasePath = process.env.DATABASE_PATH ?? "/app/data/storage.sqlite";
 const now = new Date().toISOString();
 
+const models = {
+  deepseekFlash: ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
+  deepseekPro: ["[VB]-/deepseek-v4-pro", "Verboo DeepSeek V4 Pro"],
+  minimax: ["[VB]-/minimax-m3", "Verboo MiniMax M3"],
+  mimo: ["[VB]-/mimo-v2.5", "Verboo MiMo V2.5"],
+};
+
+const textPriority = [models.deepseekPro, models.deepseekFlash];
+const textPool = () => [...textPriority];
+
 const pools = {
-  fast: [
-    ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
-    ["[VOID]/claude-haiku-4-5-20251001", "VOID Claude Haiku 4.5"],
-    ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
-    ["gemini/gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"],
-    ["gemini/gemini-3.5-flash", "Gemini 3.5 Flash"],
-  ],
-  deep: [
-    ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
-    ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
-    ["antigravity/gemini-3.6-flash-high", "Antigravity Gemini 3.6 Flash High"],
-    ["gemini/gemini-3.5-flash", "Gemini 3.5 Flash"],
-    ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
-  ],
-  agentic: [
-    ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
-    ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
-    ["antigravity/gemini-3.6-flash-high", "Antigravity Gemini 3.6 Flash High"],
-    ["gemini/gemini-3.5-flash", "Gemini 3.5 Flash"],
-    ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
-  ],
-  vision: [
-    ["[VB]-/deepseek-v4-flash", "Verboo DeepSeek V4 Flash"],
-    ["[VOID]/deepseek-v4-pro", "VOID DeepSeek V4 Pro"],
-    ["antigravity/gemini-3.6-flash-medium", "Antigravity Gemini 3.6 Flash Medium"],
-  ],
+  coder: {
+    mid: textPool(),
+    high: textPool(),
+    xhigh: textPool(),
+  },
+  analyser: {
+    mid: textPool(),
+    high: textPool(),
+    xhigh: textPool(),
+  },
+  tools: {
+    mid: textPool(),
+    high: textPool(),
+    xhigh: textPool(),
+  },
+  general: {
+    mid: textPool(),
+    high: textPool(),
+    xhigh: textPool(),
+  },
+  vision: {
+    mid: [models.minimax, models.mimo],
+    high: [models.minimax, models.mimo],
+    xhigh: [models.minimax, models.mimo],
+  },
 };
 
 function combo(name, description, pool) {
@@ -58,29 +67,24 @@ function combo(name, description, pool) {
 }
 
 const combos = [
-  combo("coder-free-mid", "BRUXO Free Coder — MID, velocidade e edição", pools.fast),
-  combo("coder-free-high", "BRUXO Free Coder — HIGH, DeepSeek e Gemini", pools.deep),
-  combo(
-    "coder-free-xhigh",
-    "BRUXO Free Coder — XHIGH, melhor pool gratuito disponível",
-    pools.deep
-  ),
-  combo("agentic-free-mid", "BRUXO Free Agentic — MID, tools e velocidade", pools.agentic),
-  combo(
-    "agentic-free-high",
-    "BRUXO Free Agentic — HIGH, tools com fallback robusto",
-    pools.agentic
-  ),
-  combo("agentic-free-xhigh", "BRUXO Free Agentic — XHIGH, tools e análise profunda", pools.deep),
-  combo("tools-free-mid", "BRUXO Free Tools — MID", pools.fast),
-  combo("tools-free-high", "BRUXO Free Tools — HIGH", pools.deep),
-  combo("tools-free-xhigh", "BRUXO Free Tools — XHIGH", pools.deep),
-  combo("analyser-free-mid", "BRUXO Free Analyser — MID", pools.fast),
-  combo("analyser-free-high", "BRUXO Free Analyser — HIGH", pools.deep),
-  combo("analyser-free-xhigh", "BRUXO Free Analyser — XHIGH", pools.deep),
-  combo("vision-free-mid", "BRUXO Free Vision — MID", pools.vision),
-  combo("vision-free-high", "BRUXO Free Vision — HIGH", pools.vision),
-  combo("vision-free-xhigh", "BRUXO Free Vision — XHIGH", pools.vision),
+  combo("coder-free-mid", "BRUXO Free Coder — MID, velocidade e edição", pools.coder.mid),
+  combo("coder-free-high", "BRUXO Free Coder — HIGH, qualidade e código", pools.coder.high),
+  combo("coder-free-xhigh", "BRUXO Free Coder — XHIGH, código complexo", pools.coder.xhigh),
+  combo("agentic-free-mid", "BRUXO Free Agentic — MID, tools e velocidade", pools.tools.mid),
+  combo("agentic-free-high", "BRUXO Free Agentic — HIGH, tools e robustez", pools.tools.high),
+  combo("agentic-free-xhigh", "BRUXO Free Agentic — XHIGH, tools complexas", pools.tools.xhigh),
+  combo("tools-free-mid", "BRUXO Free Tools — MID", pools.tools.mid),
+  combo("tools-free-high", "BRUXO Free Tools — HIGH", pools.tools.high),
+  combo("tools-free-xhigh", "BRUXO Free Tools — XHIGH", pools.tools.xhigh),
+  combo("analyser-free-mid", "BRUXO Free Analyser — MID", pools.analyser.mid),
+  combo("analyser-free-high", "BRUXO Free Analyser — HIGH", pools.analyser.high),
+  combo("analyser-free-xhigh", "BRUXO Free Analyser — XHIGH", pools.analyser.xhigh),
+  combo("general-free-mid", "BRUXO Free General — MID", pools.general.mid),
+  combo("general-free-high", "BRUXO Free General — HIGH", pools.general.high),
+  combo("general-free-xhigh", "BRUXO Free General — XHIGH", pools.general.xhigh),
+  combo("vision-free-mid", "BRUXO Free Vision — MID, visão nativa", pools.vision.mid),
+  combo("vision-free-high", "BRUXO Free Vision — HIGH, visão nativa", pools.vision.high),
+  combo("vision-free-xhigh", "BRUXO Free Vision — XHIGH, visão nativa", pools.vision.xhigh),
 ];
 
 const freeRoutes = {
@@ -93,6 +97,7 @@ const freeRoutes = {
   },
   tools: { mid: "tools-free-mid", high: "tools-free-high", xhigh: "tools-free-xhigh" },
   analyser: { mid: "analyser-free-mid", high: "analyser-free-high", xhigh: "analyser-free-xhigh" },
+  general: { mid: "general-free-mid", high: "general-free-high", xhigh: "general-free-xhigh" },
   vision: { mid: "vision-free-mid", high: "vision-free-high", xhigh: "vision-free-xhigh" },
 };
 
